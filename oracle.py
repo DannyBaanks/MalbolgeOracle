@@ -139,14 +139,32 @@ class Oracle:
     # -- loaders -----------------------------------------------------------
 
     def load_ascii(self, ascii_tape: list[str]) -> None:
-        """Load program from ASCII characters (one char per word)."""
+        """Load a program and fill the rest of memory the way the reference does.
+
+        Appendix C is `void exec( unsigned short *mem )`: it receives memory
+        already loaded and says nothing about how it got that way. The loading
+        rule therefore comes from the reference interpreter, not from the paper:
+
+            while ( i < 59049 ) mem[i] = op( mem[i - 1], mem[i - 2] ), i++;
+
+        This is load-bearing. Any program whose execution runs past its own
+        last cell — most non-trivial ones — executes whatever is in the tail,
+        so a control that zeroes it is running a different machine from every
+        other implementation.
+        """
         self.reset()
+        length = len(ascii_tape)
+        if length > MAX_MEMORY:
+            raise ValueError("Program exceeds 59049 words.")
+        if length < 2:
+            raise ValueError(
+                "Program must be at least 2 words: the fill rule reads the two "
+                "preceding cells.")
+
         for i, ch in enumerate(ascii_tape):
-            if i >= MAX_MEMORY:
-                raise ValueError("Program exceeds 59049 words.")
             self._mem[i] = ord(ch)
-        for i in range(len(ascii_tape), MAX_MEMORY):
-            self._mem[i] = 0  # rest of memory stays zero (Appendix C)
+        for i in range(length, MAX_MEMORY):
+            self._mem[i] = op(self._mem[i - 1], self._mem[i - 2])
 
     def load_bytes(self, data: bytes) -> None:
         self.load_ascii([chr(b) for b in data])

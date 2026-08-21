@@ -181,3 +181,53 @@ class DivergenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class MemoryFillTests(unittest.TestCase):
+    """How memory beyond the program is initialised.
+
+    Iizawa (2005) Appendix C is `void exec( unsigned short *mem )` — it takes
+    memory already loaded and says nothing about how it got that way. The
+    loading rule comes from the reference interpreter, which fills the rest of
+    the array from the last two cells of the program:
+
+        while ( i < 59049 ) mem[i] = op( mem[i - 1], mem[i - 2] ), i++;
+
+    This matters for any program whose execution runs past its own last cell,
+    which is most non-trivial ones. Leaving the tail at zero produces a
+    different machine from the one every other implementation runs.
+    """
+
+    def memory_after_load(self, text: str):
+        machine = Oracle()
+        machine.load_ascii(text)
+        return machine.run(max_steps=0).memory
+
+    def test_the_tail_is_filled_from_the_last_two_cells(self):
+        memory = self.memory_after_load(HELLO_WORLD)
+        n = len(HELLO_WORLD)
+        self.assertEqual(memory[n], op(memory[n - 1], memory[n - 2]))
+        self.assertEqual(memory[n + 1], op(memory[n], memory[n - 1]))
+        self.assertEqual(memory[n + 2], op(memory[n + 1], memory[n]))
+
+    def test_the_tail_is_not_left_at_zero(self):
+        """The bug this replaces: everything past the program was 0."""
+        memory = self.memory_after_load(HELLO_WORLD)
+        tail = memory[len(HELLO_WORLD):len(HELLO_WORLD) + 50]
+        self.assertTrue(any(cell != 0 for cell in tail),
+                        "memory past the program must be filled, not zeroed")
+
+    def test_the_last_cell_is_filled_too(self):
+        memory = self.memory_after_load(HELLO_WORLD)
+        self.assertEqual(memory[MEMORY_WRAP],
+                         op(memory[MEMORY_WRAP - 1], memory[MEMORY_WRAP - 2]))
+
+    def test_the_program_itself_is_untouched_by_the_fill(self):
+        memory = self.memory_after_load(HELLO_WORLD)
+        for i, ch in enumerate(HELLO_WORLD):
+            self.assertEqual(memory[i], ord(ch), f"cell {i} was overwritten")
+
+    def test_a_two_cell_program_is_the_minimum_that_can_be_filled(self):
+        """The rule reads mem[i-1] and mem[i-2], so it needs two cells."""
+        memory = self.memory_after_load("ab")
+        self.assertEqual(memory[2], op(ord("b"), ord("a")))
