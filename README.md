@@ -70,7 +70,7 @@ pruebas.
 python -m pytest test_oracle.py -v      # o: python test_oracle.py
 ```
 
-17 pruebas, sin dependencias. Verifican el oraculo contra hechos establecidos
+22 pruebas, sin dependencias. Verifican el oraculo contra hechos establecidos
 independientemente de cualquier runtime: las formas de las tablas publicadas,
 la aritmetica de las primitivas ternarias contra la tabla de verdad de la
 especificacion, el hello-world canonico, y las dos divergencias.
